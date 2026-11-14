@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CALM Wordle</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111318; --panel: #1b1e25; --line: #596170;
+      --text: #f4f5f7; --muted: #d0d4dc; --accent: #c4b5fd;
+      --correct: #048036; --present: #8a4b15; --absent: #374151;
+      --key: #596170;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button, input, select { min-height: 44px; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--accent); outline-offset: 3px;
+    }
+    .skip-link {
+      position: absolute; left: 1rem; top: -5rem; z-index: 10;
+      background: white; color: black; padding: .75rem;
+    }
+    .skip-link:focus { top: 1rem; }
+    header {
+      min-height: 66px; border-bottom: 1px solid var(--line);
+      display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center; padding: 12px 20px;
+    }
+    h1 { grid-column: 2; font-size: 1.35rem; letter-spacing: 2px; margin: 0; text-align: center; }
+    .brand span { color: var(--accent); }
+    .header-help {
+      position: relative; grid-row: 1; margin: 0; padding: 0; border: 0; border-radius: 0;
+    }
+    .header-help-left {
+      grid-column: 1; justify-self: start;
+    }
+    .header-help-right {
+      grid-column: 3; justify-self: end;
+    }
+    .header-help summary {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 42px; padding: 7px 12px; white-space: nowrap;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+      color: var(--text); font-size: .9rem; font-weight: 700; line-height: 1.2;
+      list-style: none;
+    }
+    .header-help summary::-webkit-details-marker { display: none; }
+    .help-popover {
+      position: absolute; z-index: 20; top: calc(100% + 10px);
+      width: min(340px, calc(100vw - 32px)); padding: 16px;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+    }
+    .header-help-left .help-popover {
+      left: 0;
+    }
+    .header-help-right .help-popover {
+      right: 0;
+    }
+    .help-popover h2 {
+    margin: 0 0 10px;
+    }
+    .help-popover p {
+      margin: 0 0 10px; color: var(--muted);
+    }
+    .help-popover p:last-child {
+      margin-bottom: 0;
+    }
+    .help.header-help {
+      margin: 0; padding: 0; border: 0; border-radius: 0;
+    }
+    .help.header-help summary {
+      min-height: 42px; font-size: .9rem; font-weight: 700;
+    }
+    .help .help-popover p {
+      margin: 0 0 10px;
+    }
+    .help .help-popover p:last-child {
+      margin-bottom: 0;
+    }
+    .layout {
+      width: min(1400px, calc(100% - 40px)); margin: 12px auto 12px; padding: 0;
+      display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr) minmax(0, 330px);
+      gap: 28px; align-items: center; justify-items: center;
+    }
+    .scratch,
+    .panel {
+      width: min(100%, 330px);
+      min-width: 0; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 16px; top: 16px;
+    }
+    .scratch h2 { margin: 0 0 12px; font-size: 1rem; }
+    .suspect-list {
+      min-height: 120px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
+      padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #111318;
+    }
+    .suspect-pill {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px;
+      padding: 0 8px; border: 1px solid #c4b5fd; border-radius: 999px; background: rgba(196,181,253,.12);
+      color: var(--text); font-weight: 800; letter-spacing: 1px; position: relative;
+    }
+    .suspect-pill button {
+      position: absolute; right: -7px; top: -7px; width: 18px; height: 18px; min-height: 18px;
+      border: 1px solid var(--line); border-radius: 50%; background: #111318; color: var(--text);
+      font-size: .7rem; line-height: 1; padding: 0; display: grid; place-items: center;
+    }
+    .suspect-empty {
+      color: var(--muted); font-size: .85rem; line-height: 1.5; margin: 0;
+    }
+    .scratch-controls {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 12px;
+    }
+    .scratch-controls input {
+      min-width: 0; border-radius: 7px; border: 1px solid var(--line); background: #111318; color: var(--text);
+      padding: 9px 10px; font: inherit;
+    }
+    .scratch-controls button {
+      min-width: 52px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--accent); color: #17131f; font-weight: 800;
+    }
+    .game { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+    .subtitle { color: var(--muted); text-align: center; margin: 0 0 16px; }
+    #board {
+      display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px;
+      width: min(100%, 370px); aspect-ratio: 5 / 6;
+    }
+    .guess-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .tile {
+      min-width: 0; position: relative; display: grid; place-items: center;
+      border: 2px solid #737b89; border-radius: 4px; font-size: clamp(1.3rem, 4vw, 1.9rem);
+      font-weight: 800; text-transform: uppercase; background: #171a21;
+    }
+    .tile.correct { background: var(--correct); border: 4px double #fff; }
+    .tile.present { background: var(--present); border: 3px dashed #fff; }
+    .tile.absent { background: var(--absent); border: 3px dotted #fff; }
+    .tile .mark {
+      position: absolute; right: 3px; bottom: 0; font-size: .72rem;
+      line-height: 1; font-weight: 900; background: #fff; color: #111;
+      border-radius: 2px; padding: 1px 3px;
+    }
+    .high-contrast { --correct: #0faf44; --present: #c56e0b; --absent: #1f2937; --key: #4b5563; }
+    .monochrome { --correct: #111827; --present: #111827; --absent: #111827; --key: #374151; }
+    .monochrome .tile.correct { border-style: double; }
+    .monochrome .tile.present { border-style: dashed; }
+    .monochrome .tile.absent { border-style: dotted; }
+    #keyboard { width: min(100%, 660px); margin-top: 20px; display: grid; gap: 9px; }
+    .keyrow { display: flex; justify-content: center; gap: 7px; }
+    .key {
+      flex: 1 1 0; min-width: 40px; min-height: 72px; padding: 8px 4px;
+      border: 1px solid #aeb5c1; border-radius: 4px; background: var(--key);
+      color: #fff; font-weight: 745; font-size: clamp(1.05rem, 3vw, 1.2rem);
+    }
+    .key.wide { flex: 2.1 1 0; }
+    .key.correct { background: var(--correct); border: 3px double #fff; }
+    .key.present { background: var(--present); border: 3px dashed #fff; }
+    .key.absent { background: var(--absent); border: 3px dotted #fff; }
+    .key .key-mark { display: block; font-size: .7rem; line-height: 1; }
+    .legend {
+      width: min(100%, 440px); margin: 10px 0 0; padding: 12px;
+      border: 1px solid var(--line); border-radius: 8px;
+    }
+    .legend h2 { font-size: 1rem; margin: 0 0 8px; }
+    .legend-list { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+    .legend-item { display: flex; align-items: center; gap: 7px; }
+    .legend-swatch {
+      width: 28px; height: 28px; display: grid; place-items: center;
+      color: white; background: var(--absent); border: 3px dotted white;
+      border-radius: 3px; font-weight: 900;
+    }
+    .legend-swatch.correct { background: var(--correct); border: 4px double white; }
+    .legend-swatch.present { background: var(--present); border: 3px dashed white; }
+    .status { min-height: 24px; margin: 1px 0 16px; text-align: center; color: var(--text); }
+    .status summary {
+      display: flex; min-height: 24px; align-items: center; justify-content: center;
+      gap: 8px; cursor: pointer; list-style: none;
+    }
+    .status summary::after {
+      content: ""; width: 0; height: 0; flex: 0 0 auto;
+      border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+      border-left: 7px solid var(--accent); transition: transform .15s ease;
+    }
+    .status[open] summary::after { transform: rotate(90deg); }
+    .status summary::-webkit-details-marker { display: none; }
+    .status p { margin: 4px 0 0; color: var(--muted); font-size: 1rem; }
+    .button {
+      min-height: 48px; padding: 10px 16px; border: 1px solid #d8d1ff;
+      border-radius: 7px; background: var(--accent); color: #17131f; font-weight: 800;
+    }
+    .button.secondary { background: #303642; color: #fff; border-color: #9aa3b2; }
+    .game-actions {
+      display: flex; justify-content: space-between; align-items: center;
+      width: min(100%, 380px); gap: 12px; margin: 8px 0;
+    }
+    .new-game { margin: 0; }
+    .undo { margin: 0; }
+    .panel {
+      min-width: 0; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 14px; padding: 18px;
+    }
+    .panel h2 { font-size: 1.15rem; margin: 0 0 5px; }
+    .panel p { color: var(--muted); margin: 0 0 12px; }
+    .field-label { display: block; margin: 12px 0 5px; font-weight: 700; }
+    select, input {
+      width: 100%; min-width: 0; border: 1px solid #aeb5c1; border-radius: 7px;
+      background: #111318; color: #fff; padding: 9px 10px;
+    }
+    .help {
+      margin: 12px 0; padding: 10px; border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .help summary { cursor: pointer; min-height: 28px; font-weight: 745; }
+    .help p { margin: 8px 0 0; }
+    .chat-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .chat-status { color: #d1fae5; font-size: .85rem; }
+    .chat-messages {
+      min-height: 140px; max-height: 300px; overflow-y: auto; padding: 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: #111318;
+    }
+    .chat-message { margin: 0 0 10px; padding: 9px; border-radius: 7px; overflow-wrap: anywhere; }
+    .bot-message { background: #293040; }
+    .user-message { background: #3b315d; }
+    .chat-input-area { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 10px; }
+    .chat-input-area button { min-height: 48px; padding: 8px 13px; }
+    .small-note { color: var(--muted); font-size: .9rem; margin-top: 12px; }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+      .panel { width: 100%; }
+    }
+    @media (max-width: 360px) {
+      .layout { padding: 0 10px; }
+      .panel { padding: 12px; }
+      .keyrow { gap: 3px; }
+      .key { padding-inline: 0; }
+    }
+    @media (max-width: 420px) {
+      header { padding: 10px; }
+      h1 { font-size: 1.05rem; letter-spacing: 1px; }
+      .help.header-help summary { min-height: 38px; padding: 5px 7px; font-size: .75rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 class="brand">CALM <span>WORDLE</span></h1>
+    <details class="help header-help header-help-left" id="letterGuide">
+      <summary>Letter guide</summary>
+      <div class="help-popover">
+        <h2>Letter guide and style</h2>
+          <div class="legend-item"><span class="legend-swatch correct" aria-hidden="true">✓</span><span>Correct letter and position</span></div>
+          <div class="legend-item"><span class="legend-swatch present" aria-hidden="true">~</span><span>In the word, wrong position</span></div>
+          <div class="legend-item"><span class="legend-swatch" aria-hidden="true">×</span><span>Not in the word</span></div>
+        <label class="field-label" for="feedbackStyle">Feedback style</label>
+            <select id="feedbackStyle">
+                <option value="standard">Color only</option>
+                <option value="high-contrast">High contrast + symbols</option>
+                <option value="monochrome">Monochrome + symbols</option>
+            </select>
+            <p class="small-note">Your choice is saved on this device.</p>
+      </div>
+      
+    </details>
+    <details class="help header-help header-help-right" id="howToPlay">
+      <summary>How to play</summary>
+      <div class="help-popover">
+        <h2>How to play</h2>
+        <p>Guess a five-letter word in six tries.</p>
+        <p>Use your keyboard or the on-screen keys. Press Enter to submit and Backspace to erase. Short guesses are not submitted, and there is no timer or penalty.</p>
+        <p>Your past guesses stay visible. Click “How to play” again to close this panel.</p>
+      </div>
+    </details>
+  </header>
+    <div id="win-popup" popover>
+        <h2>You Won!</h2>
+        <p id="win-message"></p>
+        <button popovertarget="win-popup" popovertargetaction="hide">
+            Close
+        </button>
+    </div>
+
+    <div id="lose-popup" popover>
+        <h2>Game Over!</h2>
+        <p id="lose-message"></p>
+        <button popovertarget="lose-popup" popovertargetaction="hide">
+            Close
+        </button>
+    </div>
+  <main class="layout">
+    <aside class="scratch" aria-label="Suspected letters scratch pad">
+      <h2>Suspected letters</h2>
+      <div id="suspectedLetters" class="suspect-list" aria-live="polite">
+        <p class="suspect-empty">No letters marked yet. Use this area as a side note board only.</p>
+      </div>
+      <div class="scratch-controls">
+        <input id="suspectInput" type="text" maxlength="1" aria-label="Add a suspected letter" placeholder="A">
+        <button id="addSuspect" type="button">Add</button>
+      </div>
+    </aside>
+
+    <section class="game" id="game" aria-labelledby="gameTitle">
+      <details class="status" id="guessFeedback">
+        <summary id="status" role="status" aria-live="polite" aria-atomic="true">Your turn. Type a five-letter word.</summary>
+        <p id="guessFeedbackDetails"></p>
+      </details>
+      <div id="board" role="group" aria-label="Six-row guess board"></div>
+      <div class="game-actions">
+        <button id="undo" class="button secondary undo" type="button">Undo</button>
+        <button id="newGame" class="button secondary new-game" type="button">New game</button>
+      </div>
+
+      <div id="keyboard" aria-label="On-screen keyboard"></div>
+    </section>
+
+    <aside class="panel" aria-label="Game help and Wordle assistant">
+      <section class="wordle-chat" aria-labelledby="chatTitle">
+        <div class="chat-header">
+          <div>
+            <h2 id="chatTitle">Wordle Assistant</h2>
+            <p>Powered by Rasa AI</p>
+          </div>
+          <span id="chatStatus" class="chat-status" role="status">Ready</span>
+        </div>
+        <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+          <div class="chat-message bot-message">Hey! I'm your Wordle assistant. Need a hint?</div>
+        </div>
+        <form id="chatForm" class="chat-input-area">
+          <label class="field-label" for="chatInput" style="grid-column:1/-1">Ask the assistant</label>
+          <input type="text" id="chatInput" placeholder="Ask for a hint..." autocomplete="off" required>
+          <button class="button" type="submit" id="chatSend">Send</button>
+        </form>
+      </section>
+    </aside>
+  </main>
+
+  <script src="./words.js"></script>
+  <script src="./wordle-data.js"></script>
+  <script>
+    (() => {
+      const words = window.WORDLE_WORDS;
+      const answerWords = words.filter(word => /^[A-Z]{5}$/.test(word));
+      const dictionary = new Set(window.WORDLE_VALID_GUESSES);
+      const maxGuesses = 6;
+      const wordDescriptions = window.WORDLE_WORD_DESCRIPTIONS;
+      const keyboardRows = ['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'];
+      const board = document.querySelector('#board');
+      const keyboard = document.querySelector('#keyboard');
+      const status = document.querySelector('#status');
+      const guessFeedback = document.querySelector('#guessFeedback');
+      const guessFeedbackDetails = document.querySelector('#guessFeedbackDetails');
+      const feedbackStyle = document.querySelector('#feedbackStyle');
+      const chatMessages = document.querySelector('#chatMessages');
+      const chatStatus = document.querySelector('#chatStatus');
+      const RASA_URL = 'https://pwxv2pq0-5005.usw2.devtunnels.ms/webhooks/rest/webhook';
+      const senderId = localStorage.getItem('wordleRasaSenderId') || ('wordle-' + crypto.randomUUID());
+      localStorage.setItem('wordleRasaSenderId', senderId);
+
+      let answer = '', guesses = [], current = '', ended = false;
+      const keyStates = {};
+      const suspectedLetters = [];
+      const suspectInput = document.querySelector('#suspectInput');
+      const suspectedLettersBox = document.querySelector('#suspectedLetters');
+
+      function renderSuspectedLetters() {
+        suspectedLettersBox.innerHTML = '';
+        if (!suspectedLetters.length) {
+          const empty = document.createElement('p');
+          empty.className = 'suspect-empty';
+          empty.textContent = 'No letters marked yet. Use this area as a side note board only.';
+          suspectedLettersBox.appendChild(empty);
+          return;
+        }
+
+        suspectedLetters.forEach((letter) => {
+          const pill = document.createElement('div');
+          pill.className = 'suspect-pill';
+          pill.textContent = letter;
+
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.setAttribute('aria-label', `Remove suspected letter ${letter}`);
+          remove.textContent = '×';
+          remove.addEventListener('click', () => {
+            const index = suspectedLetters.indexOf(letter);
+            if (index >= 0) suspectedLetters.splice(index, 1);
+            renderSuspectedLetters();
+          });
+
+          pill.appendChild(remove);
+          suspectedLettersBox.appendChild(pill);
+        });
+      }
+
+      function addSuspectedLetter(rawLetter) {
+        const letter = (rawLetter || suspectInput.value).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+        if (!letter) return;
+        if (!suspectedLetters.includes(letter)) suspectedLetters.push(letter);
+        suspectInput.value = '';
+        renderSuspectedLetters();
+      }
+
+      const savedStyle = localStorage.getItem('wordleFeedbackStyle');
+      if (['standard', 'high-contrast', 'monochrome'].includes(savedStyle)) {
+        feedbackStyle.value = savedStyle;
+      }
+      applyFeedbackStyle();
+      feedbackStyle.addEventListener('change', () => {
+        localStorage.setItem('wordleFeedbackStyle', feedbackStyle.value);
+        applyFeedbackStyle();
+      });
+      document.querySelector('#addSuspect').addEventListener('click', () => addSuspectedLetter());
+      suspectInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addSuspectedLetter();
+        }
+      });
+
+      renderSuspectedLetters();
+
+      function applyFeedbackStyle() {
+        document.body.classList.remove('high-contrast', 'monochrome');
+        if (feedbackStyle.value !== 'standard') document.body.classList.add(feedbackStyle.value);
+        draw();
+      }
+
+      function start() {
+        answer = answerWords[Math.floor(Math.random() * answerWords.length)];
+        guesses = [];
+        current = '';
+        ended = false;
+        Object.keys(keyStates).forEach(key => delete keyStates[key]);
+        draw();
+        say('New game. Type a five-letter word.');
+      }
+
+      function markName(mark) {
+        return mark === 'correct' ? 'correct letter and position' :
+          mark === 'present' ? 'letter is in the word, but in another position' :
+          'letter is not in the word';
+      }
+      function markSymbol(mark) {
+        return mark === 'correct' ? '✓' : mark === 'present' ? '~' : '×';
+      }
+
+      function draw() {
+        board.innerHTML = '';
+        for (let r = 0; r < 6; r++) {
+          const row = document.createElement('div');
+          row.className = 'guess-row';
+          row.setAttribute('role', 'group');
+          row.setAttribute('aria-label', `Guess row ${r + 1}`);
+          for (let c = 0; c < 5; c++) {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            const guess = guesses[r];
+            const letter = guess ? guess.word[c] : (r === guesses.length ? current[c] : '');
+            tile.textContent = letter || '';
+            if (guess) {
+              const mark = guess.marks[c];
+              tile.classList.add(mark);
+              tile.setAttribute('aria-label', `Row ${r + 1}, position ${c + 1}: ${letter}, ${markName(mark)}.`);
+              if (feedbackStyle.value !== 'standard') {
+                const symbol = document.createElement('span');
+                symbol.className = 'mark';
+                symbol.setAttribute('aria-hidden', 'true');
+                symbol.textContent = markSymbol(mark);
+                tile.appendChild(symbol);
+              }
+            } else {
+              tile.setAttribute('aria-label', `Row ${r + 1}, position ${c + 1}${letter ? ': ' + letter : ', empty'}`);
+            }
+            row.appendChild(tile);
+          }
+          board.appendChild(row);
+        }
+
+        keyboard.innerHTML = '';
+        keyboardRows.forEach((letters, index) => {
+          const row = document.createElement('div');
+          row.className = 'keyrow';
+          if (index === 2) addKey(row, 'ENTER', 'wide', submit);
+          for (const letter of letters) addKey(row, letter, keyStates[letter] || '', () => type(letter));
+          if (index === 2) addKey(row, '⌫', 'wide', erase);
+          keyboard.appendChild(row);
+        });
+      }
+
+      function addKey(row, label, state, action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'key' + (state ? ' ' + state : '') + (label === 'ENTER' || label === '⌫' ? ' wide' : '');
+        button.textContent = label;
+        if (state && feedbackStyle.value !== 'standard') {
+          const mark = document.createElement('span');
+          mark.className = 'key-mark';
+          mark.setAttribute('aria-hidden', 'true');
+          mark.textContent = markSymbol(state);
+          button.appendChild(mark);
+        }
+        button.setAttribute('aria-label', label === '⌫' ? 'Backspace, erase last letter' :
+          state ? `${label}, ${markName(state)}` : label);
+        button.addEventListener('click', action);
+        row.appendChild(button);
+      }
+
+      function say(message, details = '') {
+        status.textContent = message;
+        guessFeedbackDetails.textContent = details;
+        guessFeedback.open = false;
+      }
+      function type(letter) {
+        if (!ended && current.length < 5) {
+          current += letter;
+          draw();
+          say(`${current.length} of 5 letters entered.`);
+        }
+      }
+      function erase() {
+        if (!ended && current.length) {
+          current = current.slice(0, -1);
+          draw();
+          say(`Letter erased. ${current.length} of 5 letters entered.`);
+        }
+      }
+
+      function submit() {
+        if (ended) return;
+        if (current.length !== 5) {
+          say('Your guess must be five letters.');
+          return;
+        }
+        if (!dictionary.has(current)) {
+          say('Your guess is not a valid word.');
+          return;
+        }
+
+        const marks = Array(5).fill('absent');
+        const remaining = {};
+        for (const ch of answer) remaining[ch] = (remaining[ch] || 0) + 1;
+        for (let i = 0; i < 5; i++) {
+          if (current[i] === answer[i]) {
+            marks[i] = 'correct';
+            remaining[current[i]]--;
+          }
+        }
+        for (let i = 0; i < 5; i++) {
+          if (marks[i] !== 'correct' && remaining[current[i]] > 0) {
+            marks[i] = 'present';
+            remaining[current[i]]--;
+          }
+        }
+
+        const submittedWord = current;
+        guesses.push({ word: submittedWord, marks });
+        const rank = { absent: 1, present: 2, correct: 3 };
+        for (let i = 0; i < 5; i++) {
+          const letter = submittedWord[i];
+          if (!keyStates[letter] || rank[marks[i]] > rank[keyStates[letter]]) keyStates[letter] = marks[i];
+        }
+
+        const won = submittedWord === answer;
+        current = '';
+        draw();
+        const summary = marks.map((mark, i) => `${submittedWord[i]}: ${markName(mark)}`).join('; ');
+        if (won) {
+            ended = true;
+
+            document.getElementById("win-message").textContent =
+                `You got it! The word was ${answer}. ${wordDescriptions[answer] || ''}.`;
+
+            document.getElementById("win-popup").showPopover();
+
+        } else if (guesses.length === 6) {
+            ended = true;
+
+            document.getElementById("lose-message").textContent =
+                `Game over. The word was ${answer}. ${wordDescriptions[answer] || ''}.`;
+
+            document.getElementById("lose-popup").showPopover();
+
+        } else {
+            say(`Guess ${guesses.length} of 6`, summary);
+        }
+      }
+
+      function getGameContext() {
+        return {
+          guesses: guesses.map(g => ({
+            guess: g.word,
+            feedback: g.marks.map(mark => mark === 'correct' ? 'green' : mark === 'present' ? 'yellow' : 'gray')
+          })),
+          guessesRemaining: 6 - guesses.length,
+          gameOver: ended
+        };
+      }
+
+      function addChatMessage(message, sender) {
+        const bubble = document.createElement('div');
+        bubble.className = `chat-message ${sender}-message`;
+        bubble.textContent = message;
+        chatMessages.appendChild(bubble);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      function undo() {
+        if (ended || !guesses.length) return;
+        const lastGuess = guesses.pop();
+        current = lastGuess.word;
+        for (let i = 0; i < 5; i++) {
+          const letter = lastGuess.word[i];
+          if (keyStates[letter] === lastGuess.marks[i]) delete keyStates[letter];
+        }
+        ended = false;
+        draw();
+        say(`Last guess undone. ${current.length} of 5 letters entered.`);
+      }
+
+      document.querySelector('#chatForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const input = document.querySelector('#chatInput');
+        const message = input.value.trim();
+        if (!message) return;
+        addChatMessage(message, 'user');
+        input.value = '';
+        chatStatus.textContent = 'Connecting…';
+        document.querySelector('#chatSend').disabled = true;
+
+        const prompt = `${message}\n\nCurrent Wordle game state: ${JSON.stringify(getGameContext())}. The feedback labels are green=correct position, yellow=present in another position, gray=absent. Do not claim to know the hidden answer.`;
+        try {
+            const gameContext = {
+            answer: answer,
+            definition: wordDescriptions[answer] || '',
+            guesses: guesses,
+            guessesRemaining: 6 - guesses.length,
+            gameOver: ended
+            };
+          const response = await fetch(RASA_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sender: senderId, message: prompt, metadata: {wordle: gameContext} })
+          });
+          if (!response.ok) throw new Error(`Rasa returned HTTP ${response.status}.`);
+          const replies = await response.json();
+          const texts = Array.isArray(replies)
+            ? replies.map(item => item.text || item.message).filter(Boolean)
+            : [replies.text || replies.message].filter(Boolean);
+          addChatMessage(texts.join('\n') || 'The assistant did not send a text reply.', 'bot');
+          chatStatus.textContent = 'Online';
+        } catch (error) {
+          addChatMessage(`I could not connect to Rasa. Check that the Rasa server is running at localhost:5005. (${error.message})`, 'bot');
+          chatStatus.textContent = 'Offline';
+        } finally {
+          document.querySelector('#chatSend').disabled = false;
+          input.focus();
+        }
+      });
+
+      document.querySelector('#newGame').addEventListener('click', start);
+      document.querySelector('#undo').addEventListener('click', undo);
+      document.addEventListener('keydown', event => {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+        if (event.key === 'Enter') { event.preventDefault(); submit(); }
+        else if (event.key === 'Backspace') { event.preventDefault(); erase(); }
+        else if (/^[a-zA-Z]$/.test(event.key)) type(event.key.toUpperCase());
+      });
+
+      start();
+    })();
+  </script>
+</body>
+</html>

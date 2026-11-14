@@ -1,0 +1,22 @@
+flows:
+  wordle:
+    description: Play a game of Wordle with the user.
+    steps:
+      - collect: wordle_guess
+        description: the user's guess for the Wordle game
+      - action: wordle_feedback
+
+  wordle_help:
+    description: Give the user a hint or a short definition for the current Wordle word.
+    steps:
+      - collect: hint_choice
+        description: whether the user wants a hint or a definition for the current Wordle word
+        next:
+          - if: slots.hint_choice == "definition"
+            then:
+              - action: wordle_definition
+                next: END
+          - else:
+              - action: wordle_hint
+                next: END
+

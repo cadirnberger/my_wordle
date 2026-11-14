@@ -1,0 +1,52 @@
+version: "3.1"
+
+slots:
+  hint_choice:
+    type: categorical
+    values:
+      - hint
+      - definition
+    mappings:
+      - type: from_llm
+  wordle_guess:
+    type: text
+    mappings:
+      - type: from_llm
+  wordle_answer:
+    type: text
+    mappings:
+      - type: custom
+        conditions:
+          - active_loop: null
+
+actions:
+  - start_wordle
+  - wordle_hint
+  - wordle_definition
+  - wordle_feedback
+
+responses:
+  utter_ask_hint_choice:
+    - text: "Please choose whether you want a hint or a definition for the current Wordle word."
+  utter_ask_wordle_guess:
+    - text: "What is your guess for the Wordle game?"
+  utter_wordle_feedback:
+    - text: "Your guess is {wordle_guess}."
+  utter_wordle_feedback_correct:
+    - text: "Congratulations! Your guess is correct."
+  utter_wordle_feedback_incorrect_with_hint:
+    - text: "Sorry, your guess is incorrect. Here's a hint: {wordle_hint}."
+
+  utter_free_chitchat_response:
+    - text: "placeholder"
+      metadata:
+        rephrase: True
+        rephrase_prompt: |
+          The following is a conversation with an AI assistant built with Rasa.
+          The assistant can help the user play Wordle.
+          The assistant is helpful, creative, clever, and very friendly.
+          The user is making small talk, and the assistant should respond, keeping things light.
+          Context / previous conversation with the user:
+          {{history}}
+          {{current_input}}
+          Suggested AI Response:
